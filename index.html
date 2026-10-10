@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="IMG_2741.JPG">
 <meta property="og:title" content="Jonas Bock · Digitale Kontaktkarte">
 <meta property="og:description" content="Bauingenieurwesen · FH Erfurt">
-<meta property="og:image" content="IMG_2741.JPG">
+<meta property="og:image" content="https://jbock-kontakt.de/IMG_2741.JPG">
 
 <style>
 :root {
@@ -499,7 +499,7 @@ footer {
     <p class="role" id="txt-role">Bauingenieurwesen · FH Erfurt</p>
   </header>
 
-  <!-- Tresor-Sperre (Wird angezeigt, wenn kein NFC-Key vorhanden ist) -->
+  <!-- Tresor-Sperre -->
   <div class="lock-card" id="lockCard">
     <div class="lock-icon">
       <svg viewBox="0 0 24 24">
@@ -516,7 +516,7 @@ footer {
     <div class="error-msg" id="errorMsg">Falsche PIN. Bitte erneut versuchen.</div>
   </div>
 
-  <!-- Geschützte Kontaktdaten (Werden erst nach mathematischer Entschlüsselung angezeigt) -->
+  <!-- Geschützte Kontaktdaten -->
   <section class="actions protected-content" id="protectedActions" aria-label="Kontaktmöglichkeiten">
 
     <button class="action primary haptic" id="saveContact" type="button">
@@ -655,15 +655,13 @@ footer {
 </div>
 
 <script>
-// AES-256 GEKRÜMMTE / VERSCHLÜSSELTE DATEN UND DERE DERIVAT-SALT
-const SALT_HEX = "a84b06e885d56d1c97ef3ebf2d7a2283";
-const IV_HEX = "9826f534e7bb41103c80a0fe";
+const SALT_HEX = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+const IV_HEX   = "102030405060708090a0b0c0";
 
-// Rein kryptografische AES-GCM Chiffretexte
 const ENCRYPTED_DATA = {
-  emP: "d4ba0d15b0ef093a7cf617651a700f1c379bf97aef0066d9efaa39fa5a9eb0d0e65ec8c4",
-  emU: "da3a1811a9e0132b79a512701b7a0f1d3c9eb87ef2047ed6fba834f35b80b7d3f8",
-  ph:  "d33b0002b8e30b3d68f2177413"
+  emP: "79b42c67edbd7d191c95eeff4dbe927eef84ae460a80e15f201e51b14731",
+  emU: "73b72367f0be71120093ebfe4db2877eeb8fa54f4291f044300350a4423b8f",
+  ph:  "3101016ec7e33a5b069daddd4a04"
 };
 
 let decryptedStore = null;
@@ -761,15 +759,18 @@ async function decryptString(cipherHex, key) {
 }
 
 async function attemptUnlock(passphrase) {
+  if (!passphrase) return false;
+  const cleanPass = passphrase.trim().toLowerCase();
+
   try {
-    const key = await deriveKey(passphrase);
+    const key = await deriveKey(cleanPass);
     const emP = await decryptString(ENCRYPTED_DATA.emP, key);
     const emU = await decryptString(ENCRYPTED_DATA.emU, key);
-    const ph = await decryptString(ENCRYPTED_DATA.ph, key);
+    const ph  = await decryptString(ENCRYPTED_DATA.ph, key);
 
     if (emP && emU && ph) {
       decryptedStore = { emP, emU, ph };
-      activeKey = passphrase;
+      activeKey = cleanPass;
 
       document.getElementById("val-mail-priv").textContent = emP;
       document.getElementById("val-mail-uni").textContent = emU;
@@ -783,7 +784,7 @@ async function attemptUnlock(passphrase) {
       document.getElementById("lockCard").style.display = "none";
       document.getElementById("protectedActions").classList.add("unlocked");
 
-      localStorage.setItem("nfcPassKey", passphrase);
+      localStorage.setItem("nfcPassKey", cleanPass);
       return true;
     }
   } catch (err) {}
@@ -826,6 +827,7 @@ function setLanguage(lang) {
 }
 
 document.getElementById("unlockBtn").addEventListener("click", async () => {
+  document.getElementById("errorMsg").style.display = "none";
   const pin = document.getElementById("pinInput").value;
   const ok = await attemptUnlock(pin);
   if (!ok) {
@@ -869,7 +871,7 @@ if (savedLang) {
   setLanguage(savedLang);
 }
 
-// Dynamic vCard Export
+// vCard Export
 document.getElementById("saveContact").addEventListener("click", () => {
   if (!decryptedStore) return;
 
