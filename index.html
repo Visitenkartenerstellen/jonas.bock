@@ -273,10 +273,10 @@ footer {
   </div>
 
   <header class="profile">
-    <!-- Profilbild muss im selben Ordner liegen. -->
+    <!-- Profilbild aktualisiert zu IMG_2741.jpg -->
     <img
       class="avatar"
-      src="profilbild_jonas.jpg"
+      src="IMG_2741.jpg"
       alt="Profilbild von Jonas Bock"
     >
 
@@ -300,8 +300,8 @@ footer {
       <span class="arrow">›</span>
     </button>
 
-    <a class="action"
-       href="mailto:Jonas.bock@bock-familie.de,jonas.bock@fh-erfurt.de">
+    <!-- Separate E-Mail: Privat -->
+    <a class="action" href="mailto:Jonas.bock@bock-familie.de">
       <span class="icon">
         <svg viewBox="0 0 24 24">
           <rect x="2" y="4" width="20" height="16" rx="2"/>
@@ -309,11 +309,23 @@ footer {
         </svg>
       </span>
       <span class="copy">
-        <strong>E-Mail</strong>
-        <small>
-          Jonas.bock@bock-familie.de<br>
-          jonas.bock@fh-erfurt.de
-        </small>
+        <strong>E-Mail (Privat)</strong>
+        <small>Jonas.bock@bock-familie.de</small>
+      </span>
+      <span class="arrow">›</span>
+    </a>
+
+    <!-- Separate E-Mail: Universität -->
+    <a class="action" href="mailto:jonas.bock@fh-erfurt.de">
+      <span class="icon">
+        <svg viewBox="0 0 24 24">
+          <rect x="2" y="4" width="20" height="16" rx="2"/>
+          <path d="m3 6 9 7 9-7"/>
+        </svg>
+      </span>
+      <span class="copy">
+        <strong>E-Mail (FH Erfurt)</strong>
+        <small>jonas.bock@fh-erfurt.de</small>
       </span>
       <span class="arrow">›</span>
     </a>
@@ -393,7 +405,7 @@ const person = {
   lastName: "Bock",
   organization: "FH Erfurt",
   title: "Bauingenieurwesen",
-  email: "Jonas.bock@bock-familie.de",
+  emailPrivate: "Jonas.bock@bock-familie.de",
   emailUniversity: "jonas.bock@fh-erfurt.de",
   phone: "+491711578750"
 };
@@ -414,8 +426,8 @@ document.getElementById("saveContact").addEventListener("click", () => {
     `FN:${esc(person.firstName + " " + person.lastName)}`,
     `ORG:${esc(person.organization)}`,
     `TITLE:${esc(person.title)}`,
-    `EMAIL;TYPE=INTERNET:${esc(person.email)}`,
-    `EMAIL;TYPE=INTERNET:${esc(person.emailUniversity)}`,
+    `EMAIL;TYPE=HOME:${esc(person.emailPrivate)}`,
+    `EMAIL;TYPE=WORK:${esc(person.emailUniversity)}`,
     `TEL;TYPE=CELL:${esc(person.phone)}`,
     `URL:${esc(window.location.href)}`,
     "END:VCARD"
