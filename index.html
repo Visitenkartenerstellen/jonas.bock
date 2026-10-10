@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#080b0e">
 <meta name="description" content="Die digitale Kontaktkarte von Jonas Bock.">
+<meta name="robots" content="noindex, nofollow">
 <title>Jonas Bock · Digitale Kontaktkarte</title>
 
 <!-- Favicon & Social Media Vorschau -->
@@ -21,6 +22,7 @@
   --muted: #9ba9bc;
   --line: #263442;
   --accent: #b6f66d;
+  --error: #ff5f5f;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -98,7 +100,7 @@ main {
 
 .profile {
   text-align: center;
-  padding-bottom: 30px;
+  padding-bottom: 24px;
 }
 
 .avatar {
@@ -128,8 +130,104 @@ h1 {
   margin: 16px 0 0;
 }
 
-.actions {
+/* Tresor / Sperrbildschirm */
+.lock-card {
+  border: 1px solid var(--line);
+  border-radius: 23px;
+  background: linear-gradient(115deg, #0d141a, #0a0f14);
+  padding: 28px 20px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.lock-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  color: var(--accent);
+}
+
+.lock-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lock-card h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.lock-card p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pin-form {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.pin-input {
+  background: #080b0e;
+  border: 1px solid var(--line);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.pin-input:focus {
+  border-color: var(--accent);
+}
+
+.pin-btn {
+  background: var(--accent);
+  color: #0b1107;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.pin-btn:hover { background: #c8ff8b; }
+
+.error-msg {
+  color: var(--error);
+  font-size: 12px;
+  margin-top: 10px;
+  display: none;
+}
+
+/* Versteckte Kontakt-Aktionen bis zur Freischaltung */
+.protected-content {
+  display: none;
+}
+
+.protected-content.unlocked {
   display: grid;
+}
+
+.actions {
   gap: 13px;
 }
 
@@ -402,7 +500,25 @@ footer {
     <p class="role" id="txt-role">Bauingenieurwesen · FH Erfurt</p>
   </header>
 
-  <section class="actions" aria-label="Kontaktmöglichkeiten">
+  <!-- Tresor-Sperre (Wird angezeigt, wenn kein NFC-Key vorhanden ist) -->
+  <div class="lock-card" id="lockCard">
+    <div class="lock-icon">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <h3 id="txt-lock-title">Zugriff geschützt</h3>
+    <p id="txt-lock-desc">Scanne die NFC-Karte oder gib die PIN ein, um Kontaktdaten freizuschalten.</p>
+    <div class="pin-form">
+      <input type="password" class="pin-input" id="pinInput" placeholder="PIN" maxlength="10">
+      <button class="pin-btn haptic" id="unlockBtn" type="button">OK</button>
+    </div>
+    <div class="error-msg" id="errorMsg">Falsche PIN. Bitte erneut versuchen.</div>
+  </div>
+
+  <!-- Geschützte Kontaktdaten (Werden erst nach Freischaltung geladen) -->
+  <section class="actions protected-content" id="protectedActions" aria-label="Kontaktmöglichkeiten">
 
     <button class="action primary haptic" id="saveContact" type="button">
       <span class="icon">
@@ -418,7 +534,7 @@ footer {
       <span class="arrow">›</span>
     </button>
 
-    <a class="action haptic" href="https://wa.me/491711578750" target="_blank" rel="noopener noreferrer">
+    <a class="action haptic" id="link-wa" href="#" target="_blank" rel="noopener noreferrer">
       <span class="icon">
         <svg viewBox="0 0 24 24">
           <path d="M3 21l1.65-3.8A9 9 0 1 1 21 12a8.9 8.9 0 0 1-2.9 6.5A8.9 8.9 0 0 1 12 21a8.9 8.9 0 0 1-4.2-1L3 21z"/>
@@ -432,7 +548,7 @@ footer {
       <span class="arrow">›</span>
     </a>
 
-    <a class="action haptic" href="mailto:Jonas.bock@bock-familie.de">
+    <a class="action haptic" id="link-mail-priv" href="#">
       <span class="icon">
         <svg viewBox="0 0 24 24">
           <rect x="2" y="4" width="20" height="16" rx="2"/>
@@ -441,12 +557,12 @@ footer {
       </span>
       <span class="copy">
         <strong id="txt-mail-priv-title">E-Mail (Privat)</strong>
-        <small>Jonas.bock@bock-familie.de</small>
+        <small id="txt-mail-priv-val">Jonas.bock@bock-familie.de</small>
       </span>
       <span class="arrow">›</span>
     </a>
 
-    <a class="action haptic" href="mailto:jonas.bock@fh-erfurt.de">
+    <a class="action haptic" id="link-mail-uni" href="#">
       <span class="icon">
         <svg viewBox="0 0 24 24">
           <rect x="2" y="4" width="20" height="16" rx="2"/>
@@ -455,12 +571,12 @@ footer {
       </span>
       <span class="copy">
         <strong id="txt-mail-uni-title">E-Mail (FH Erfurt)</strong>
-        <small>jonas.bock@fh-erfurt.de</small>
+        <small id="txt-mail-uni-val">jonas.bock@fh-erfurt.de</small>
       </span>
       <span class="arrow">›</span>
     </a>
 
-    <a class="action haptic" href="tel:+491711578750">
+    <a class="action haptic" id="link-phone" href="#">
       <span class="icon">
         <svg viewBox="0 0 24 24">
           <path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 18a19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 3.2 2 2 0 0 1 4.1 1h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z"/>
@@ -535,25 +651,23 @@ footer {
   <div class="modal-content">
     <button class="modal-close haptic" id="closeLegal">✕</button>
     <h2 id="modal-title">Impressum & Datenschutz</h2>
-    <div id="modal-body">
-      <p><strong>Angaben gemäß § 5 TMG:</strong><br>
-      Jonas Bock<br>
-      E-Mail: Jonas.bock@bock-familie.de<br>
-      Telefon: +49 171 1578750</p>
-
-      <p><strong>Datenschutz:</strong><br>
-      Diese Webseite dient ausschließlich der Bereitstellung von Kontaktdaten. Es werden keine personenbezogenen Daten der Besucher erfasst, gespeichert oder verarbeitet. Es kommen keine Tracking-Cookies oder Analysedienste zum Einsatz.</p>
-    </div>
+    <div id="modal-body"></div>
   </div>
 </div>
 
 <script>
+// GEHEIMER SCHLÜSSEL / PIN FÜR DEN NFC-CHIP
+const SECRET_KEY = "bau2026";
+
 let currentLang = "de";
 
 const translations = {
   de: {
     nfc: "NFC BEREIT",
     role: "Bauingenieurwesen · FH Erfurt",
+    lockTitle: "Zugriff geschützt",
+    lockDesc: "Scanne die NFC-Karte oder gib die PIN ein, um Kontaktdaten freizuschalten.",
+    errPin: "Falsche PIN. Bitte erneut versuchen.",
     saveTitle: "Kontakt speichern",
     saveDesc: "Zu deinen Kontakten hinzufügen",
     waDesc: "Direkt eine Nachricht schreiben",
@@ -575,6 +689,9 @@ const translations = {
   en: {
     nfc: "NFC READY",
     role: "Civil Engineering · FH Erfurt",
+    lockTitle: "Protected Access",
+    lockDesc: "Scan the NFC card or enter the PIN to unlock contact details.",
+    errPin: "Incorrect PIN. Please try again.",
     saveTitle: "Save Contact",
     saveDesc: "Add to your contacts",
     waDesc: "Send a direct message",
@@ -595,6 +712,18 @@ const translations = {
   }
 };
 
+// Maskierte Kontaktdaten (Base64), um automatisiertes Spam-Scraping zu verhindern
+const personData = {
+  fn: "Jonas",
+  ln: "Bock",
+  org: "FH Erfurt",
+  emP: "Sm9uYXMuYm9ja0Bib2NrLWZhbWlsaWUuZGU=", // Jonas.bock@bock-familie.de
+  emU: "am9uYXMuYm9ja0BmaC1lcmZ1cnQuZGU=",       // jonas.bock@fh-erfurt.de
+  ph: "KzQ5MTcxMTU3ODc1MA=="                    // +491711578750
+};
+
+const decode = str => atob(str);
+
 function setLanguage(lang) {
   currentLang = lang;
   const t = translations[lang];
@@ -604,6 +733,9 @@ function setLanguage(lang) {
 
   document.getElementById("txt-nfc").textContent = t.nfc;
   document.getElementById("txt-role").textContent = t.role;
+  document.getElementById("txt-lock-title").textContent = t.lockTitle;
+  document.getElementById("txt-lock-desc").textContent = t.lockDesc;
+  document.getElementById("errorMsg").textContent = t.errPin;
   document.getElementById("txt-save-title").textContent = t.saveTitle;
   document.getElementById("txt-save-desc").textContent = t.saveDesc;
   document.getElementById("txt-wa-desc").textContent = t.waDesc;
@@ -623,14 +755,49 @@ function setLanguage(lang) {
   localStorage.setItem("preferredLang", lang);
 }
 
-const person = {
-  firstName: "Jonas",
-  lastName: "Bock",
-  organization: "FH Erfurt",
-  emailPrivate: "Jonas.bock@bock-familie.de",
-  emailUniversity: "jonas.bock@fh-erfurt.de",
-  phone: "+491711578750"
-};
+function unlockContactData() {
+  const emailPriv = decode(personData.emP);
+  const emailUni = decode(personData.emU);
+  const phone = decode(personData.ph);
+
+  // Dynamisches Einsetzen der echten Links
+  document.getElementById("link-wa").href = `https://wa.me/${phone.replace('+', '')}`;
+  document.getElementById("link-mail-priv").href = `mailto:${emailPriv}`;
+  document.getElementById("link-mail-uni").href = `mailto:${emailUni}`;
+  document.getElementById("link-phone").href = `tel:${phone}`;
+
+  // UI-Wechsel von Tresor zu Kontaktdaten
+  document.getElementById("lockCard").style.display = "none";
+  document.getElementById("protectedActions").classList.add("unlocked");
+
+  localStorage.setItem("nfcUnlocked", "true");
+}
+
+function verifyAccess() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const keyParam = urlParams.get("key");
+
+  // Prüfen ob URL-Key übereinstimmt ODER bereits früher freigeschaltet wurde
+  if (keyParam === SECRET_KEY || localStorage.getItem("nfcUnlocked") === "true") {
+    unlockContactData();
+  }
+}
+
+// PIN-Eingabe Event
+document.getElementById("unlockBtn").addEventListener("click", () => {
+  const inputPin = document.getElementById("pinInput").value;
+  if (inputPin === SECRET_KEY) {
+    unlockContactData();
+  } else {
+    document.getElementById("errorMsg").style.display = "block";
+  }
+});
+
+document.getElementById("pinInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    document.getElementById("unlockBtn").click();
+  }
+});
 
 const triggerVibration = () => {
   if ("vibrate" in navigator) {
@@ -662,7 +829,12 @@ if (savedLang) {
   setLanguage(savedLang);
 }
 
+// vCard Erstellung nach Freischaltung
 document.getElementById("saveContact").addEventListener("click", () => {
+  const emailPriv = decode(personData.emP);
+  const emailUni = decode(personData.emU);
+  const phone = decode(personData.ph);
+
   const esc = value =>
     String(value)
       .replace(/([,;\\])/g, "\\$1")
@@ -671,14 +843,14 @@ document.getElementById("saveContact").addEventListener("click", () => {
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
-    `N:${esc(person.lastName)};${esc(person.firstName)};;;`,
-    `FN:${esc(person.firstName + " " + person.lastName)}`,
-    `ORG:${esc(person.organization)}`,
+    `N:${esc(personData.ln)};${esc(personData.fn)};;;`,
+    `FN:${esc(personData.fn + " " + personData.ln)}`,
+    `ORG:${esc(personData.org)}`,
     `TITLE:${esc(translations[currentLang].vcardTitle)}`,
-    `EMAIL;TYPE=HOME:${esc(person.emailPrivate)}`,
-    `EMAIL;TYPE=WORK:${esc(person.emailUniversity)}`,
-    `TEL;TYPE=CELL:${esc(person.phone)}`,
-    `URL:${esc(window.location.href)}`,
+    `EMAIL;TYPE=HOME:${esc(emailPriv)}`,
+    `EMAIL;TYPE=WORK:${esc(emailUni)}`,
+    `TEL;TYPE=CELL:${esc(phone)}`,
+    `URL:${esc(window.location.origin + window.location.pathname)}`,
     "END:VCARD"
   ];
 
@@ -699,27 +871,31 @@ document.getElementById("saveContact").addEventListener("click", () => {
 });
 
 document.getElementById("sharePage").addEventListener("click", async () => {
+  const shareUrl = `${window.location.origin}${window.location.pathname}?key=${SECRET_KEY}`;
   const data = {
     title: `Jonas Bock · ${translations[currentLang].footer}`,
     text: translations[currentLang].saveDesc,
-    url: window.location.href
+    url: shareUrl
   };
 
   try {
     if (navigator.share) {
       await navigator.share(data);
     } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(shareUrl);
       alert(translations[currentLang].shareAlert);
     } else {
-      prompt(translations[currentLang].sharePrompt, window.location.href);
+      prompt(translations[currentLang].sharePrompt, shareUrl);
     }
   } catch (error) {
     if (error.name !== "AbortError") {
-      prompt(translations[currentLang].sharePrompt, window.location.href);
+      prompt(translations[currentLang].sharePrompt, shareUrl);
     }
   }
 });
+
+// Zugriff prüfen
+verifyAccess();
 </script>
 </body>
 </html>
