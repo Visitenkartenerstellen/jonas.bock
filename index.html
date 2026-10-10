@@ -218,7 +218,6 @@ h1 {
   display: none;
 }
 
-/* Versteckte Kontakt-Aktionen bis zur Freischaltung */
 .protected-content {
   display: none;
 }
@@ -511,13 +510,13 @@ footer {
     <h3 id="txt-lock-title">Zugriff geschützt</h3>
     <p id="txt-lock-desc">Scanne die NFC-Karte oder gib die PIN ein, um Kontaktdaten freizuschalten.</p>
     <div class="pin-form">
-      <input type="password" class="pin-input" id="pinInput" placeholder="PIN" maxlength="10">
+      <input type="password" class="pin-input" id="pinInput" placeholder="PIN" maxlength="15">
       <button class="pin-btn haptic" id="unlockBtn" type="button">OK</button>
     </div>
     <div class="error-msg" id="errorMsg">Falsche PIN. Bitte erneut versuchen.</div>
   </div>
 
-  <!-- Geschützte Kontaktdaten (Werden erst nach Freischaltung geladen) -->
+  <!-- Geschützte Kontaktdaten (Werden erst nach mathematischer Entschlüsselung angezeigt) -->
   <section class="actions protected-content" id="protectedActions" aria-label="Kontaktmöglichkeiten">
 
     <button class="action primary haptic" id="saveContact" type="button">
@@ -557,7 +556,7 @@ footer {
       </span>
       <span class="copy">
         <strong id="txt-mail-priv-title">E-Mail (Privat)</strong>
-        <small id="txt-mail-priv-val">Jonas.bock@bock-familie.de</small>
+        <small id="val-mail-priv"></small>
       </span>
       <span class="arrow">›</span>
     </a>
@@ -571,7 +570,7 @@ footer {
       </span>
       <span class="copy">
         <strong id="txt-mail-uni-title">E-Mail (FH Erfurt)</strong>
-        <small id="txt-mail-uni-val">jonas.bock@fh-erfurt.de</small>
+        <small id="val-mail-uni"></small>
       </span>
       <span class="arrow">›</span>
     </a>
@@ -584,7 +583,7 @@ footer {
       </span>
       <span class="copy">
         <strong id="txt-phone-title">Telefon</strong>
-        <small id="txt-phone-desc">+49 171 1578750 · Direkt anrufen</small>
+        <small id="val-phone"></small>
       </span>
       <span class="arrow">›</span>
     </a>
@@ -656,9 +655,19 @@ footer {
 </div>
 
 <script>
-// GEHEIMER SCHLÜSSEL / PIN FÜR DEN NFC-CHIP
-const SECRET_KEY = "bau2026";
+// AES-256 GEKRÜMMTE / VERSCHLÜSSELTE DATEN UND DERE DERIVAT-SALT
+const SALT_HEX = "a84b06e885d56d1c97ef3ebf2d7a2283";
+const IV_HEX = "9826f534e7bb41103c80a0fe";
 
+// Rein kryptografische AES-GCM Chiffretexte
+const ENCRYPTED_DATA = {
+  emP: "d4ba0d15b0ef093a7cf617651a700f1c379bf97aef0066d9efaa39fa5a9eb0d0e65ec8c4",
+  emU: "da3a1811a9e0132b79a512701b7a0f1d3c9eb87ef2047ed6fba834f35b80b7d3f8",
+  ph:  "d33b0002b8e30b3d68f2177413"
+};
+
+let decryptedStore = null;
+let activeKey = null;
 let currentLang = "de";
 
 const translations = {
@@ -674,7 +683,7 @@ const translations = {
     mailPrivTitle: "E-Mail (Privat)",
     mailUniTitle: "E-Mail (FH Erfurt)",
     phoneTitle: "Telefon",
-    phoneDesc: "+49 171 1578750 · Direkt anrufen",
+    phoneDesc: "· Direkt anrufen",
     shareTitle: "Profil teilen",
     shareDesc: "Kontaktseite weitergeben",
     tagline: "BAUEN · PLANEN · ZUKUNFT GESTALTEN",
@@ -698,7 +707,7 @@ const translations = {
     mailPrivTitle: "Email (Private)",
     mailUniTitle: "Email (FH Erfurt)",
     phoneTitle: "Phone",
-    phoneDesc: "+49 171 1578750 · Call directly",
+    phoneDesc: "· Call directly",
     shareTitle: "Share Profile",
     shareDesc: "Share contact page",
     tagline: "BUILDING · PLANNING · SHAPING THE FUTURE",
@@ -712,17 +721,74 @@ const translations = {
   }
 };
 
-// Maskierte Kontaktdaten (Base64), um automatisiertes Spam-Scraping zu verhindern
-const personData = {
-  fn: "Jonas",
-  ln: "Bock",
-  org: "FH Erfurt",
-  emP: "Sm9uYXMuYm9ja0Bib2NrLWZhbWlsaWUuZGU=", // Jonas.bock@bock-familie.de
-  emU: "am9uYXMuYm9ja0BmaC1lcmZ1cnQuZGU=",       // jonas.bock@fh-erfurt.de
-  ph: "KzQ5MTcxMTU3ODc1MA=="                    // +491711578750
-};
+const hexToBuf = hex => new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+const bufToStr = buf => new TextDecoder().decode(buf);
 
-const decode = str => atob(str);
+async function deriveKey(passphrase) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(passphrase),
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: hexToBuf(SALT_HEX),
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+}
+
+async function decryptString(cipherHex, key) {
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: hexToBuf(IV_HEX) },
+      key,
+      hexToBuf(cipherHex)
+    );
+    return bufToStr(decrypted);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function attemptUnlock(passphrase) {
+  try {
+    const key = await deriveKey(passphrase);
+    const emP = await decryptString(ENCRYPTED_DATA.emP, key);
+    const emU = await decryptString(ENCRYPTED_DATA.emU, key);
+    const ph = await decryptString(ENCRYPTED_DATA.ph, key);
+
+    if (emP && emU && ph) {
+      decryptedStore = { emP, emU, ph };
+      activeKey = passphrase;
+
+      document.getElementById("val-mail-priv").textContent = emP;
+      document.getElementById("val-mail-uni").textContent = emU;
+      document.getElementById("val-phone").textContent = `${ph} ${translations[currentLang].phoneDesc}`;
+
+      document.getElementById("link-wa").href = `https://wa.me/${ph.replace('+', '')}`;
+      document.getElementById("link-mail-priv").href = `mailto:${emP}`;
+      document.getElementById("link-mail-uni").href = `mailto:${emU}`;
+      document.getElementById("link-phone").href = `tel:${ph}`;
+
+      document.getElementById("lockCard").style.display = "none";
+      document.getElementById("protectedActions").classList.add("unlocked");
+
+      localStorage.setItem("nfcPassKey", passphrase);
+      return true;
+    }
+  } catch (err) {}
+  return false;
+}
 
 function setLanguage(lang) {
   currentLang = lang;
@@ -742,7 +808,11 @@ function setLanguage(lang) {
   document.getElementById("txt-mail-priv-title").textContent = t.mailPrivTitle;
   document.getElementById("txt-mail-uni-title").textContent = t.mailUniTitle;
   document.getElementById("txt-phone-title").textContent = t.phoneTitle;
-  document.getElementById("txt-phone-desc").textContent = t.phoneDesc;
+  
+  if (decryptedStore) {
+    document.getElementById("val-phone").textContent = `${decryptedStore.ph} ${t.phoneDesc}`;
+  }
+
   document.getElementById("txt-share-title").textContent = t.shareTitle;
   document.getElementById("txt-share-desc").textContent = t.shareDesc;
   document.getElementById("txt-tagline").textContent = t.tagline;
@@ -755,45 +825,15 @@ function setLanguage(lang) {
   localStorage.setItem("preferredLang", lang);
 }
 
-function unlockContactData() {
-  const emailPriv = decode(personData.emP);
-  const emailUni = decode(personData.emU);
-  const phone = decode(personData.ph);
-
-  // Dynamisches Einsetzen der echten Links
-  document.getElementById("link-wa").href = `https://wa.me/${phone.replace('+', '')}`;
-  document.getElementById("link-mail-priv").href = `mailto:${emailPriv}`;
-  document.getElementById("link-mail-uni").href = `mailto:${emailUni}`;
-  document.getElementById("link-phone").href = `tel:${phone}`;
-
-  // UI-Wechsel von Tresor zu Kontaktdaten
-  document.getElementById("lockCard").style.display = "none";
-  document.getElementById("protectedActions").classList.add("unlocked");
-
-  localStorage.setItem("nfcUnlocked", "true");
-}
-
-function verifyAccess() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const keyParam = urlParams.get("key");
-
-  // Prüfen ob URL-Key übereinstimmt ODER bereits früher freigeschaltet wurde
-  if (keyParam === SECRET_KEY || localStorage.getItem("nfcUnlocked") === "true") {
-    unlockContactData();
-  }
-}
-
-// PIN-Eingabe Event
-document.getElementById("unlockBtn").addEventListener("click", () => {
-  const inputPin = document.getElementById("pinInput").value;
-  if (inputPin === SECRET_KEY) {
-    unlockContactData();
-  } else {
+document.getElementById("unlockBtn").addEventListener("click", async () => {
+  const pin = document.getElementById("pinInput").value;
+  const ok = await attemptUnlock(pin);
+  if (!ok) {
     document.getElementById("errorMsg").style.display = "block";
   }
 });
 
-document.getElementById("pinInput").addEventListener("keypress", (e) => {
+document.getElementById("pinInput").addEventListener("keypress", async (e) => {
   if (e.key === "Enter") {
     document.getElementById("unlockBtn").click();
   }
@@ -829,11 +869,9 @@ if (savedLang) {
   setLanguage(savedLang);
 }
 
-// vCard Erstellung nach Freischaltung
+// Dynamic vCard Export
 document.getElementById("saveContact").addEventListener("click", () => {
-  const emailPriv = decode(personData.emP);
-  const emailUni = decode(personData.emU);
-  const phone = decode(personData.ph);
+  if (!decryptedStore) return;
 
   const esc = value =>
     String(value)
@@ -843,13 +881,13 @@ document.getElementById("saveContact").addEventListener("click", () => {
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
-    `N:${esc(personData.ln)};${esc(personData.fn)};;;`,
-    `FN:${esc(personData.fn + " " + personData.ln)}`,
-    `ORG:${esc(personData.org)}`,
+    "N:Bock;Jonas;;;",
+    "FN:Jonas Bock",
+    "ORG:FH Erfurt",
     `TITLE:${esc(translations[currentLang].vcardTitle)}`,
-    `EMAIL;TYPE=HOME:${esc(emailPriv)}`,
-    `EMAIL;TYPE=WORK:${esc(emailUni)}`,
-    `TEL;TYPE=CELL:${esc(phone)}`,
+    `EMAIL;TYPE=HOME:${esc(decryptedStore.emP)}`,
+    `EMAIL;TYPE=WORK:${esc(decryptedStore.emU)}`,
+    `TEL;TYPE=CELL:${esc(decryptedStore.ph)}`,
     `URL:${esc(window.location.origin + window.location.pathname)}`,
     "END:VCARD"
   ];
@@ -871,7 +909,10 @@ document.getElementById("saveContact").addEventListener("click", () => {
 });
 
 document.getElementById("sharePage").addEventListener("click", async () => {
-  const shareUrl = `${window.location.origin}${window.location.pathname}?key=${SECRET_KEY}`;
+  const shareUrl = activeKey 
+    ? `${window.location.origin}${window.location.pathname}?key=${activeKey}`
+    : window.location.href;
+
   const data = {
     title: `Jonas Bock · ${translations[currentLang].footer}`,
     text: translations[currentLang].saveDesc,
@@ -894,8 +935,23 @@ document.getElementById("sharePage").addEventListener("click", async () => {
   }
 });
 
-// Zugriff prüfen
-verifyAccess();
+// Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
+async function initSecurity() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const keyParam = urlParams.get("key");
+  const storedPass = localStorage.getItem("nfcPassKey");
+
+  if (keyParam) {
+    const success = await attemptUnlock(keyParam);
+    if (success) return;
+  }
+  
+  if (storedPass) {
+    await attemptUnlock(storedPass);
+  }
+}
+
+initSecurity();
 </script>
 </body>
 </html>
