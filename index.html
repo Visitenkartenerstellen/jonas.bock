@@ -173,7 +173,7 @@ h1 {
   display: flex;
   gap: 10px;
   justify-content: center;
-  max-width: 300px;
+  max-width: 320px;
   margin: 0 auto;
 }
 
@@ -189,7 +189,7 @@ h1 {
   outline: none;
   transition: border-color 0.2s;
   text-align: center;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .pin-input:focus {
@@ -511,7 +511,7 @@ footer {
     <h3 id="txt-lock-title">Zugriff geschützt</h3>
     <p id="txt-lock-desc">Scanne die NFC-Karte oder gib die PIN ein, um Kontaktdaten freizuschalten.</p>
     <div class="pin-form">
-      <input type="password" class="pin-input" id="pinInput" placeholder="PIN" maxlength="15">
+      <input type="password" class="pin-input" id="pinInput" placeholder="PIN" maxlength="30">
       <button class="pin-btn haptic" id="unlockBtn" type="button">OK</button>
     </div>
     <div class="error-msg" id="errorMsg">Falsche PIN. Bitte erneut versuchen.</div>
@@ -657,7 +657,8 @@ footer {
 </div>
 
 <script>
-const HASH_TARGET = "f0d3788e3c560dad1f1346dc057d1f291f0c330127f76a027a5e4c5925ffc5ac";
+// Exakter SHA-256 Hash für das neue Passwort: J+:or7dsk5kJfV-b04cs
+const HASH_TARGET = "7c04e229bf240974ed28ef9ea330fccf5407fa7a216e9137d0c3eb1df1ddf3fb";
 
 const SECURE_DATA = {
   emP: "Jonas.bock@bock-familie.de",
@@ -749,7 +750,7 @@ function updateModalContent() {
 
 async function attemptUnlock(passphrase) {
   if (!passphrase) return false;
-  const cleanPass = passphrase.trim().toLowerCase();
+  const cleanPass = passphrase.trim();
 
   const inputHash = await sha256(cleanPass);
 
@@ -904,7 +905,7 @@ document.getElementById("saveContact").addEventListener("click", () => {
 
 document.getElementById("sharePage").addEventListener("click", async () => {
   const shareUrl = activeKey 
-    ? `${window.location.origin}${window.location.pathname}?key=${activeKey}`
+    ? `${window.location.origin}${window.location.pathname}?key=${encodeURIComponent(activeKey)}`
     : window.location.href;
 
   const data = {
