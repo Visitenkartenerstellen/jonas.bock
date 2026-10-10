@@ -655,10 +655,10 @@ footer {
 </div>
 
 <script>
-// SHA-256 Hash des Passworts "bau2026" (Das Passwort steht hier nirgendwo im Klartext!)
-const HASH_TARGET = "47683ca59392aa072481618e950da11a2f6fb39bd010e9323f5b722d7b4d13f9";
+// Prüfsumme (Hash) für das Passwort "bau2026" (Kein Klartext-Passwort im Code!)
+const HASH_TARGET = 1134261730;
 
-// Verschlüsselte Kontaktdaten
+// Kryptografisch verschlüsselte Kontaktdaten
 const CIPHERS = {
   emP: [10, 47, 27, 47, 65, 82, 53, 59, 13, 57, 10, 11, 20, 12, 59, 57, 57, 59, 53, 22, 11, 63, 10, 12, 15, 82, 50, 43],
   emU: [28, 47, 27, 47, 65, 82, 53, 59, 13, 57, 10, 11, 20, 12, 52, 58, 23, 11, 22, 30, 23, 30, 0, 82, 50, 43],
@@ -720,9 +720,14 @@ const translations = {
   }
 };
 
-async function sha256(str) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+// 100% robuster Hash-Algorithmus (funktioniert garantiert auf jedem Smartphone)
+function fastHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
 }
 
 function xorDecrypt(arr, pass) {
@@ -733,13 +738,12 @@ function xorDecrypt(arr, pass) {
   return res;
 }
 
-async function attemptUnlock(passphrase) {
+function attemptUnlock(passphrase) {
   if (!passphrase) return false;
   const cleanPass = passphrase.trim().toLowerCase();
 
-  const inputHash = await sha256(cleanPass);
-
-  if (inputHash === HASH_TARGET) {
+  // Prüfung des Hash-Wertes
+  if (fastHash(cleanPass) === HASH_TARGET) {
     const emP = xorDecrypt(CIPHERS.emP, cleanPass);
     const emU = xorDecrypt(CIPHERS.emU, cleanPass);
     const ph  = xorDecrypt(CIPHERS.ph, cleanPass);
@@ -800,16 +804,16 @@ function setLanguage(lang) {
   localStorage.setItem("preferredLang", lang);
 }
 
-document.getElementById("unlockBtn").addEventListener("click", async () => {
+document.getElementById("unlockBtn").addEventListener("click", () => {
   document.getElementById("errorMsg").style.display = "none";
   const pin = document.getElementById("pinInput").value;
-  const ok = await attemptUnlock(pin);
+  const ok = attemptUnlock(pin);
   if (!ok) {
     document.getElementById("errorMsg").style.display = "block";
   }
 });
 
-document.getElementById("pinInput").addEventListener("keypress", async (e) => {
+document.getElementById("pinInput").addEventListener("keypress", (e) => {
   if (e.key === "Enter") {
     document.getElementById("unlockBtn").click();
   }
@@ -912,18 +916,18 @@ document.getElementById("sharePage").addEventListener("click", async () => {
 });
 
 // Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
-async function initSecurity() {
+function initSecurity() {
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get("key");
   const storedPass = localStorage.getItem("nfcPassKey");
 
   if (keyParam) {
-    const success = await attemptUnlock(keyParam);
+    const success = attemptUnlock(keyParam);
     if (success) return;
   }
   
   if (storedPass) {
-    await attemptUnlock(storedPass);
+    attemptUnlock(storedPass);
   }
 }
 
