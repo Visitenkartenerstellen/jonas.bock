@@ -657,8 +657,8 @@ footer {
 </div>
 
 <script>
-// SHA-256 Hash für das Passwort: J+:or7dsk5kJfV-b04cs
-const HASH_TARGET = "0608af0aba24abcd19a090eb24e9269313f448b0b7b8f9bd6a760a54683dd8ba;
+// Korrekter SHA-256 Hash für das Passwort: J+:or7dsk5kJfV-b04cs
+const HASH_TARGET = "0608af0aba24abcd19a090eb24e9269313f448b0b7b8f9bd6a760a54683dd8ba";
 
 const SECURE_DATA = {
   emP: "Jonas.bock@bock-familie.de",
@@ -864,69 +864,43 @@ if (savedLang) {
   updateModalContent();
 }
 
-// vCard Export mit automatischer Standortabfrage (Geolokalisierung)
+// vCard Export
 document.getElementById("saveContact").addEventListener("click", () => {
   if (!decryptedStore) return;
 
-  const generateAndDownloadVCard = (mapsUrl = "") => {
-    const esc = value =>
-      String(value)
-        .replace(/([,;\\])/g, "\\$1")
-        .replace(/\n/g, "\\n");
+  const esc = value =>
+    String(value)
+      .replace(/([,;\\])/g, "\\$1")
+      .replace(/\n/g, "\\n");
 
-    let noteText = "Digitale Visitenkarte von Jonas Bock (jbock-kontakt.de)";
-    if (mapsUrl) {
-      noteText += `\\nOrt der Begegnung: ${mapsUrl}`;
-    }
+  const lines = [
+    "BEGIN:VCARD",
+    "VERSION:3.0",
+    "N:Bock;Jonas;;;",
+    "FN:Jonas Bock",
+    "ORG:FH Erfurt",
+    `TITLE:${esc(translations[currentLang].vcardTitle)}`,
+    `EMAIL;TYPE=HOME:${esc(decryptedStore.emP)}`,
+    `EMAIL;TYPE=WORK:${esc(decryptedStore.emU)}`,
+    `TEL;TYPE=CELL:${esc(decryptedStore.ph)}`,
+    `URL:${esc(window.location.origin + window.location.pathname)}`,
+    "END:VCARD"
+  ];
 
-    const lines = [
-      "BEGIN:VCARD",
-      "VERSION:3.0",
-      "N:Bock;Jonas;;;",
-      "FN:Jonas Bock",
-      "ORG:FH Erfurt",
-      `TITLE:${esc(translations[currentLang].vcardTitle)}`,
-      `EMAIL;TYPE=HOME:${esc(decryptedStore.emP)}`,
-      `EMAIL;TYPE=WORK:${esc(decryptedStore.emU)}`,
-      `TEL;TYPE=CELL:${esc(decryptedStore.ph)}`,
-      `URL:${esc(window.location.origin + window.location.pathname)}`,
-      `NOTE:${esc(noteText)}`,
-      "END:VCARD"
-    ];
+  const blob = new Blob(
+    [lines.join("\r\n")],
+    { type: "text/vcard;charset=utf-8" }
+  );
 
-    const blob = new Blob(
-      [lines.join("\r\n")],
-      { type: "text/vcard;charset=utf-8" }
-    );
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "Jonas-Bock.vcf";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "Jonas-Bock.vcf";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  if ("geolocation" in navigator) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const mapsUrl = `https://maps.google.com/?q=${lat},${lon}`;
-        generateAndDownloadVCard(mapsUrl);
-      },
-      (error) => {
-        // Falls der Nutzer ablehnt oder der Standort nicht ermittelt wird
-        generateAndDownloadVCard();
-      },
-      { timeout: 15000, maximumAge: 60000, enableHighAccuracy: true }
-    );
-  } else {
-    generateAndDownloadVCard();
-  }
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 document.getElementById("sharePage").addEventListener("click", async () => {
