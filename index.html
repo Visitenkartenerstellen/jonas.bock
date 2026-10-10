@@ -218,21 +218,6 @@ h1 {
   display: none;
 }
 
-/* Diagnose-Box */
-.debug-box {
-  margin-top: 16px;
-  background: #000;
-  color: #ffb66d;
-  font-family: monospace;
-  font-size: 11px;
-  text-align: left;
-  padding: 10px;
-  border-radius: 8px;
-  max-height: 140px;
-  overflow-y: auto;
-  border: 1px solid var(--line);
-}
-
 .protected-content {
   display: none;
 }
@@ -529,7 +514,6 @@ footer {
       <button class="pin-btn haptic" id="unlockBtn" type="button">OK</button>
     </div>
     <div class="error-msg" id="errorMsg">Falsche PIN. Bitte erneut versuchen.</div>
-    <div class="debug-box" id="debug">Diagnose gestartet...</div>
   </div>
 
   <!-- Geschützte Kontaktdaten -->
@@ -671,8 +655,8 @@ footer {
 </div>
 
 <script>
-// SHA-256 Hash des Passworts "bau2026"
-const HASH_TARGET = "47683ca59392aa072481618e950da11a2f6fb39bd010e9323f5b722d7b4d13f9";
+// Exakter SHA-256 Hash für "bau2026"
+const HASH_TARGET = "f0d3788e3c560dad1f1346dc057d1f291f0c330127f76a027a5e4c5925ffc5ac";
 
 // Kontaktdaten
 const SECURE_DATA = {
@@ -740,18 +724,12 @@ const translations = {
   }
 };
 
-function log(msg) {
-  const dbg = document.getElementById("debug");
-  if (dbg) dbg.innerHTML += "<br>> " + msg;
-}
-
 // SHA-256 Hash via Web Crypto API
 async function sha256(str) {
   try {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
   } catch(e) {
-    log("CRYPTO FEHLER: " + e.message);
     return "";
   }
 }
@@ -771,21 +749,12 @@ function updateModalContent() {
 }
 
 async function attemptUnlock(passphrase) {
-  log("Versuche Freischaltung...");
-  if (!passphrase) {
-    log("Passphrase ist leer.");
-    return false;
-  }
-
+  if (!passphrase) return false;
   const cleanPass = passphrase.trim().toLowerCase();
-  log("Eingabe: '" + cleanPass + "'");
 
   const inputHash = await sha256(cleanPass);
-  log("Berechneter SHA-256 Hash: " + inputHash);
-  log("Soll-Hash: " + HASH_TARGET);
 
   if (inputHash === HASH_TARGET) {
-    log("SUCCESS: Hash stimmt überein! Schalte Daten frei...");
     const emP = SECURE_DATA.emP;
     const emU = SECURE_DATA.emU;
     const ph  = SECURE_DATA.ph;
@@ -807,12 +776,9 @@ async function attemptUnlock(passphrase) {
 
     updateModalContent();
     localStorage.setItem("nfcPassKey", cleanPass);
-    log("Daten erfolgreich angezeigt!");
     return true;
-  } else {
-    log("FEHLER: Hashes stimmen nicht überein.");
-    return false;
   }
+  return false;
 }
 
 function setLanguage(lang) {
@@ -966,19 +932,16 @@ document.getElementById("sharePage").addEventListener("click", async () => {
 
 // Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
 async function initSecurity() {
-  log("Starte initSecurity()...");
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get("key");
   const storedPass = localStorage.getItem("nfcPassKey");
 
   if (keyParam) {
-    log("URL-Key gefunden: '" + keyParam + "'");
     const success = await attemptUnlock(keyParam);
     if (success) return;
   }
   
   if (storedPass) {
-    log("Gespeicherter Key in Session gefunden.");
     await attemptUnlock(storedPass);
   }
 }
