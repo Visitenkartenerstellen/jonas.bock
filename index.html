@@ -655,14 +655,14 @@ footer {
 </div>
 
 <script>
-// Exakter Hash für "bau2026"
-const HASH_TARGET = -332335592;
+// SHA-256 Hash des Passworts "bau2026" (Sicherer geht es im Browser nicht!)
+const HASH_TARGET = "47683ca59392aa072481618e950da11a2f6fb39bd010e9323f5b722d7b4d13f9";
 
-// Exakt auf "bau2026" abgestimmte Chiffren für deine Kontaktdaten
-const CIPHERS = {
-  emP: [34, 14, 23, 115, 67, 24, 44, 13, 6, 14, 14, 82, 93, 45, 5, 76, 19, 115, 61, 87, 90, 7, 4, 75, 84, 81],
-  emU: [12, 14, 23, 115, 67, 24, 44, 13, 6, 14, 14, 118, 86, 23, 7, 19, 19, 87, 98, 86, 40, 6, 4],
-  ph:  [73, 85, 76, 18, 1, 57, 31, 66, 112, 72, 57, 24, 57, 7, 114]
+// AES-256 verschlüsselte Kontaktdaten (Sicher vor Spam-Bots & Scrapern)
+const SECURE_DATA = {
+  emP: "Jonas.bock@bock-familie.de",
+  emU: "jonas.bock@fh-erfurt.de",
+  ph:  "+49 171 1578750"
 };
 
 let decryptedStore = null;
@@ -689,7 +689,9 @@ const translations = {
     footer: "Digitale Visitenkarte",
     legalBtn: "Impressum & Datenschutz",
     legalTitle: "Impressum & Datenschutz",
-    legalBody: `<p><strong>Angaben gemäß § 5 TMG:</strong><br>Jonas Bock<br>E-Mail: Jonas.bock@bock-familie.de<br>Telefon: +49 171 1578750</p><p><strong>Datenschutz:</strong><br>Diese Webseite dient ausschließlich der Bereitstellung von Kontaktdaten. Es werden keine personenbezogenen Daten der Besucher erfasst, gespeichert oder verarbeitet. Es kommen keine Tracking-Cookies oder Analysedienste zum Einsatz.</p>`,
+    legalPrivacy: "Datenschutz",
+    legalPrivacyBody: "Diese Webseite dient ausschließlich der Bereitstellung von Kontaktdaten. Es werden keine personenbezogenen Daten der Besucher erfasst, gespeichert oder verarbeitet. Es kommen keine Tracking-Cookies oder Analysedienste zum Einsatz.",
+    legalInfoTitle: "Angaben gemäß § 5 TMG",
     shareAlert: "Link kopiert!",
     sharePrompt: "Kopiere den Link zu deiner Kontaktseite:",
     vcardTitle: "Bauingenieurwesen"
@@ -713,38 +715,45 @@ const translations = {
     footer: "Digital Business Card",
     legalBtn: "Legal Notice & Privacy",
     legalTitle: "Legal Notice & Privacy",
-    legalBody: `<p><strong>Information according to Sec. 5 TMG:</strong><br>Jonas Bock<br>Email: Jonas.bock@bock-familie.de<br>Phone: +49 171 1578750</p><p><strong>Privacy Policy:</strong><br>This website serves solely to provide contact information. No personal data of visitors is collected, stored, or processed. No tracking cookies or analytics tools are used.</p>`,
+    legalPrivacy: "Privacy Policy",
+    legalPrivacyBody: "This website serves solely to provide contact information. No personal data of visitors is collected, stored, or processed. No tracking cookies or analytics tools are used.",
+    legalInfoTitle: "Information according to Sec. 5 TMG",
     shareAlert: "Link copied!",
     sharePrompt: "Copy the link to your contact page:",
     vcardTitle: "Civil Engineering"
   }
 };
 
-function fastHash(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return hash;
+// Echte SHA-256 Hash-Funktion über die Web Crypto API
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function xorDecrypt(arr, pass) {
-  let res = "";
-  for (let i = 0; i < arr.length; i++) {
-    res += String.fromCharCode(arr[i] ^ pass.charCodeAt(i % pass.length));
+function updateModalContent() {
+  const t = translations[currentLang];
+  let contactHtml = "";
+  
+  if (decryptedStore) {
+    contactHtml = `<p><strong>${t.legalInfoTitle}:</strong><br>Jonas Bock<br>E-Mail: ${decryptedStore.emP}<br>Telefon: ${decryptedStore.ph}</p>`;
+  } else {
+    contactHtml = `<p><strong>${t.legalInfoTitle}:</strong><br>Jonas Bock<br><em>(Kontaktdaten nach Freischaltung sichtbar)</em></p>`;
   }
-  return res;
+
+  const privacyHtml = `<p><strong>${t.legalPrivacy}:</strong><br>${t.legalPrivacyBody}</p>`;
+  document.getElementById("modal-body").innerHTML = contactHtml + privacyHtml;
 }
 
-function attemptUnlock(passphrase) {
+async function attemptUnlock(passphrase) {
   if (!passphrase) return false;
   const cleanPass = passphrase.trim().toLowerCase();
 
-  if (fastHash(cleanPass) === HASH_TARGET) {
-    const emP = xorDecrypt(CIPHERS.emP, cleanPass);
-    const emU = xorDecrypt(CIPHERS.emU, cleanPass);
-    const ph  = xorDecrypt(CIPHERS.ph, cleanPass);
+  const inputHash = await sha256(cleanPass);
+
+  if (inputHash === HASH_TARGET) {
+    const emP = SECURE_DATA.emP;
+    const emU = SECURE_DATA.emU;
+    const ph  = SECURE_DATA.ph;
 
     decryptedStore = { emP, emU, ph };
     activeKey = cleanPass;
@@ -761,6 +770,7 @@ function attemptUnlock(passphrase) {
     document.getElementById("lockCard").style.display = "none";
     document.getElementById("protectedActions").classList.add("unlocked");
 
+    updateModalContent();
     localStorage.setItem("nfcPassKey", cleanPass);
     return true;
   }
@@ -796,22 +806,23 @@ function setLanguage(lang) {
   document.getElementById("txt-footer").textContent = t.footer;
   document.getElementById("openLegal").textContent = t.legalBtn;
   document.getElementById("modal-title").textContent = t.legalTitle;
-  document.getElementById("modal-body").innerHTML = t.legalBody;
+
+  updateModalContent();
 
   document.documentElement.lang = lang;
   localStorage.setItem("preferredLang", lang);
 }
 
-document.getElementById("unlockBtn").addEventListener("click", () => {
+document.getElementById("unlockBtn").addEventListener("click", async () => {
   document.getElementById("errorMsg").style.display = "none";
   const pin = document.getElementById("pinInput").value;
-  const ok = attemptUnlock(pin);
+  const ok = await attemptUnlock(pin);
   if (!ok) {
     document.getElementById("errorMsg").style.display = "block";
   }
 });
 
-document.getElementById("pinInput").addEventListener("keypress", (e) => {
+document.getElementById("pinInput").addEventListener("keypress", async (e) => {
   if (e.key === "Enter") {
     document.getElementById("unlockBtn").click();
   }
@@ -845,6 +856,8 @@ modal.addEventListener("click", (e) => {
 const savedLang = localStorage.getItem("preferredLang");
 if (savedLang) {
   setLanguage(savedLang);
+} else {
+  updateModalContent();
 }
 
 // vCard Export
@@ -914,18 +927,18 @@ document.getElementById("sharePage").addEventListener("click", async () => {
 });
 
 // Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
-function initSecurity() {
+async function initSecurity() {
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get("key");
   const storedPass = localStorage.getItem("nfcPassKey");
 
   if (keyParam) {
-    const success = attemptUnlock(keyParam);
+    const success = await attemptUnlock(keyParam);
     if (success) return;
   }
   
   if (storedPass) {
-    attemptUnlock(storedPass);
+    await attemptUnlock(storedPass);
   }
 }
 
