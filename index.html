@@ -218,6 +218,21 @@ h1 {
   display: none;
 }
 
+/* Diagnose-Box */
+.debug-box {
+  margin-top: 16px;
+  background: #000;
+  color: #ffb66d;
+  font-family: monospace;
+  font-size: 11px;
+  text-align: left;
+  padding: 10px;
+  border-radius: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+}
+
 .protected-content {
   display: none;
 }
@@ -514,6 +529,7 @@ footer {
       <button class="pin-btn haptic" id="unlockBtn" type="button">OK</button>
     </div>
     <div class="error-msg" id="errorMsg">Falsche PIN. Bitte erneut versuchen.</div>
+    <div class="debug-box" id="debug">Diagnose gestartet...</div>
   </div>
 
   <!-- Geschützte Kontaktdaten -->
@@ -655,10 +671,8 @@ footer {
 </div>
 
 <script>
-// Prüfsumme (Hash) für das Passwort "bau2026" (Kein Klartext-Passwort im Code!)
 const HASH_TARGET = 1134261730;
 
-// Kryptografisch verschlüsselte Kontaktdaten
 const CIPHERS = {
   emP: [10, 47, 27, 47, 65, 82, 53, 59, 13, 57, 10, 11, 20, 12, 59, 57, 57, 59, 53, 22, 11, 63, 10, 12, 15, 82, 50, 43],
   emU: [28, 47, 27, 47, 65, 82, 53, 59, 13, 57, 10, 11, 20, 12, 52, 58, 23, 11, 22, 30, 23, 30, 0, 82, 50, 43],
@@ -720,7 +734,11 @@ const translations = {
   }
 };
 
-// 100% robuster Hash-Algorithmus (funktioniert garantiert auf jedem Smartphone)
+function log(msg) {
+  const dbg = document.getElementById("debug");
+  if (dbg) dbg.innerHTML += "<br>> " + msg;
+}
+
 function fastHash(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -739,11 +757,20 @@ function xorDecrypt(arr, pass) {
 }
 
 function attemptUnlock(passphrase) {
-  if (!passphrase) return false;
+  log("Versuche Freischaltung...");
+  if (!passphrase) {
+    log("Passphrase ist leer.");
+    return false;
+  }
+  
   const cleanPass = passphrase.trim().toLowerCase();
+  log("Eingabe: '" + cleanPass + "'");
+  
+  const calcHash = fastHash(cleanPass);
+  log("Hash: " + calcHash + " (Soll: " + HASH_TARGET + ")");
 
-  // Prüfung des Hash-Wertes
-  if (fastHash(cleanPass) === HASH_TARGET) {
+  if (calcHash === HASH_TARGET) {
+    log("Erfolgreich! Entschlüssele...");
     const emP = xorDecrypt(CIPHERS.emP, cleanPass);
     const emU = xorDecrypt(CIPHERS.emU, cleanPass);
     const ph  = xorDecrypt(CIPHERS.ph, cleanPass);
@@ -765,8 +792,10 @@ function attemptUnlock(passphrase) {
 
     localStorage.setItem("nfcPassKey", cleanPass);
     return true;
+  } else {
+    log("Hash stimmt nicht überein!");
+    return false;
   }
-  return false;
 }
 
 function setLanguage(lang) {
@@ -917,16 +946,19 @@ document.getElementById("sharePage").addEventListener("click", async () => {
 
 // Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
 function initSecurity() {
+  log("Starte initSecurity()...");
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get("key");
   const storedPass = localStorage.getItem("nfcPassKey");
 
   if (keyParam) {
+    log("URL-Key gefunden: " + keyParam);
     const success = attemptUnlock(keyParam);
     if (success) return;
   }
   
   if (storedPass) {
+    log("Gespeicherter Key gefunden.");
     attemptUnlock(storedPass);
   }
 }
