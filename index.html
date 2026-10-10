@@ -47,7 +47,7 @@ main {
 
 .lang-switch {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   background: rgba(38, 52, 66, 0.4);
   padding: 3px;
   border-radius: 12px;
@@ -60,7 +60,7 @@ main {
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -305,7 +305,7 @@ footer {
     </div>
     <div class="status">
       <span class="nfc-dot"></span>
-      <span id="txt-nfc">◖)) &nbsp; NFC BEREIT</span>
+      <span id="txt-nfc">NFC BEREIT</span>
     </div>
   </div>
 
@@ -322,7 +322,7 @@ footer {
 
   <section class="actions" aria-label="Kontaktmöglichkeiten">
 
-    <!-- Kontakt speichern -->
+    <!-- Haupt-Action: Kontakt speichern -->
     <button class="action primary haptic" id="saveContact" type="button">
       <span class="icon">
         <svg viewBox="0 0 24 24">
@@ -352,7 +352,7 @@ footer {
       <span class="arrow">›</span>
     </a>
 
-    <!-- E-Mail: Privat -->
+    <!-- E-Mail Privat -->
     <a class="action haptic" href="mailto:Jonas.bock@bock-familie.de">
       <span class="icon">
         <svg viewBox="0 0 24 24">
@@ -367,7 +367,7 @@ footer {
       <span class="arrow">›</span>
     </a>
 
-    <!-- E-Mail: Universität -->
+    <!-- E-Mail FH Erfurt -->
     <a class="action haptic" href="mailto:jonas.bock@fh-erfurt.de">
       <span class="icon">
         <svg viewBox="0 0 24 24">
@@ -458,7 +458,7 @@ let currentLang = "de";
 
 const translations = {
   de: {
-    nfc: "◖)) &nbsp; NFC BEREIT",
+    nfc: "NFC BEREIT",
     role: "Bauingenieurwesen · FH Erfurt",
     saveTitle: "Kontakt speichern",
     saveDesc: "Zu deinen Kontakten hinzufügen",
@@ -476,7 +476,7 @@ const translations = {
     vcardTitle: "Bauingenieurwesen"
   },
   en: {
-    nfc: "◖)) &nbsp; NFC READY",
+    nfc: "NFC READY",
     role: "Civil Engineering · FH Erfurt",
     saveTitle: "Save Contact",
     saveDesc: "Add to your contacts",
@@ -502,7 +502,7 @@ function setLanguage(lang) {
   document.getElementById("btn-de").classList.toggle("active", lang === "de");
   document.getElementById("btn-en").classList.toggle("active", lang === "en");
 
-  document.getElementById("txt-nfc").innerHTML = t.nfc;
+  document.getElementById("txt-nfc").textContent = t.nfc;
   document.getElementById("txt-role").textContent = t.role;
   document.getElementById("txt-save-title").textContent = t.saveTitle;
   document.getElementById("txt-save-desc").textContent = t.saveDesc;
@@ -529,7 +529,6 @@ const person = {
   phone: "+491711578750"
 };
 
-// Haptisches Feedback (Vibration)
 const triggerVibration = () => {
   if ("vibrate" in navigator) {
     navigator.vibrate(25);
@@ -542,7 +541,6 @@ document.querySelectorAll(".haptic").forEach(element => {
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
-// Gespeicherte Sprache beim Laden abrufen
 const savedLang = localStorage.getItem("preferredLang");
 if (savedLang) {
   setLanguage(savedLang);
