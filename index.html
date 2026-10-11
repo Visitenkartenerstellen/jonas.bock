@@ -669,7 +669,7 @@ footer {
 
 <script>
 // Korrekter SHA-256 Hash für das Passwort: J+:or7dsk5kJfV-b04cs
-const HASH_TARGET = "0608af0aba24abcd19a090eb24e9269313f448b0b7b8f9bd6a760a54683dd8ba";
+const HASH_TARGET = "c1b6ec562ca6b3b59e479e8658fd4f2535700989de7ed1a213afea7639f51043";
 
 const SECURE_DATA = {
   emP: "Jonas.bock@bock-familie.de",
@@ -685,6 +685,10 @@ let currentLang = "de";
 let failedAttempts = parseInt(localStorage.getItem("failedAttempts") || "0", 10);
 let lockoutUntil = parseInt(localStorage.getItem("lockoutUntil") || "0", 10);
 let lockoutTimer = null;
+
+// Auto-Lock Variable (5 Minuten = 300.000 ms)
+let autoLockTimer = null;
+const AUTO_LOCK_TIMEOUT = 5 * 60 * 1000;
 
 const translations = {
   de: {
@@ -766,7 +770,7 @@ function updateModalContent() {
   document.getElementById("modal-body").innerHTML = contactHtml + privacyHtml;
 }
 
-// Hilfsfunktion zum sauberen Entfernen des Passworts aus der Browser-URL
+// Passwort aus der Browser-URL entfernen
 function cleanUrlParams() {
   if (window.history && window.history.replaceState) {
     const cleanUrl = window.location.origin + window.location.pathname;
@@ -774,7 +778,35 @@ function cleanUrlParams() {
   }
 }
 
-// Prüft, ob der Nutzer gesperrt ist und aktualisiert den Live-Timer mehrsprachig
+// 5-Minuten-Auto-Sperre Logik
+function lockPage() {
+  decryptedStore = null;
+  activeKey = null;
+  localStorage.removeItem("nfcPassKey");
+
+  document.getElementById("protectedContent").classList.remove("unlocked");
+  document.getElementById("lockCard").style.display = "block";
+  document.getElementById("pinInput").value = "";
+
+  if (autoLockTimer) {
+    clearTimeout(autoLockTimer);
+    autoLockTimer = null;
+  }
+  updateModalContent();
+}
+
+function resetAutoLockTimer() {
+  if (!decryptedStore) return;
+  if (autoLockTimer) clearTimeout(autoLockTimer);
+  autoLockTimer = setTimeout(lockPage, AUTO_LOCK_TIMEOUT);
+}
+
+// Bei Bewegung / Klicks des Nutzers den 5-Minuten-Timer erneuern
+["mousemove", "keydown", "touchstart", "scroll", "click"].forEach(evt => {
+  window.addEventListener(evt, resetAutoLockTimer, { passive: true });
+});
+
+// Prüft, ob der Nutzer gesperrt ist und aktualisiert den Live-Timer
 function checkLockout() {
   const now = Date.now();
   const remaining = Math.ceil((lockoutUntil - now) / 1000);
@@ -844,8 +876,8 @@ async function attemptUnlock(passphrase) {
     updateModalContent();
     localStorage.setItem("nfcPassKey", cleanPass);
     
-    // URL-Bereinigung: Passwort aus der Adresszeile entfernen!
     cleanUrlParams();
+    resetAutoLockTimer(); // Startet die 5-Minuten-Auto-Sperre
     return true;
   } else {
     // Falsche PIN -> Fehlversuche erhöhen
@@ -853,7 +885,6 @@ async function attemptUnlock(passphrase) {
     localStorage.setItem("failedAttempts", failedAttempts);
 
     if (failedAttempts >= 3) {
-      // 3. Versuch = 30s | 4. Versuch = 60s | 5. Versuch = 90s usw.
       const waitSeconds = (failedAttempts - 2) * 30;
       lockoutUntil = Date.now() + (waitSeconds * 1000);
       localStorage.setItem("lockoutUntil", lockoutUntil);
