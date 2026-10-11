@@ -681,7 +681,7 @@ let decryptedStore = null;
 let activeKey = null;
 let currentLang = "de";
 
-// Rate Limiting / Sperr-Variablen
+// Rate-Limiting Variablen
 let failedAttempts = parseInt(localStorage.getItem("failedAttempts") || "0", 10);
 let lockoutUntil = parseInt(localStorage.getItem("lockoutUntil") || "0", 10);
 let lockoutTimer = null;
@@ -764,7 +764,7 @@ function updateModalContent() {
   document.getElementById("modal-body").innerHTML = contactHtml + privacyHtml;
 }
 
-// Prüft, ob der Nutzer aktuell gesperrt ist und aktualisiert den Countdown
+// Prüft, ob der Nutzer gesperrt ist und aktualisiert den Live-Timer
 function checkLockout() {
   const now = Date.now();
   const remaining = Math.ceil((lockoutUntil - now) / 1000);
@@ -785,8 +785,6 @@ function checkLockout() {
           clearInterval(lockoutTimer);
           lockoutTimer = null;
           localStorage.removeItem("lockoutUntil");
-          localStorage.removeItem("failedAttempts");
-          failedAttempts = 0;
           lockoutUntil = 0;
           pinInput.disabled = false;
           unlockBtn.disabled = false;
@@ -809,7 +807,7 @@ async function attemptUnlock(passphrase) {
   const inputHash = await sha256(cleanPass);
 
   if (inputHash === HASH_TARGET) {
-    // Erfolgreich -> Fehlversuche zurücksetzen
+    // Richtige PIN -> Fehlversuche komplett zurücksetzen
     localStorage.removeItem("failedAttempts");
     localStorage.removeItem("lockoutUntil");
     failedAttempts = 0;
@@ -837,13 +835,12 @@ async function attemptUnlock(passphrase) {
     localStorage.setItem("nfcPassKey", cleanPass);
     return true;
   } else {
-    // Fehlversuch hochzählen
+    // Falsche PIN -> Fehlversuche erhöhen und speichern
     failedAttempts++;
     localStorage.setItem("failedAttempts", failedAttempts);
 
     if (failedAttempts >= 3) {
-      // Ab dem 3. Versuch: 30s für den 3. Versuch, dann +30s für jeden weiteren
-      // (3. Versuch = 30s, 4. Versuch = 60s, 5. Versuch = 90s, etc.)
+      // 3. Versuch = 30s | 4. Versuch = 60s | 5. Versuch = 90s usw.
       const waitSeconds = (failedAttempts - 2) * 30;
       lockoutUntil = Date.now() + (waitSeconds * 1000);
       localStorage.setItem("lockoutUntil", lockoutUntil);
@@ -1010,7 +1007,6 @@ document.getElementById("sharePage").addEventListener("click", async () => {
 
 // Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
 async function initSecurity() {
-  // Direkt beim Start prüfen, ob eine aktive Sperre vorliegt
   if (checkLockout()) return;
 
   const urlParams = new URLSearchParams(window.location.search);
