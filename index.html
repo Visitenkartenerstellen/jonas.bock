@@ -196,6 +196,11 @@ h1 {
   border-color: var(--accent);
 }
 
+.pin-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .pin-btn {
   background: var(--accent);
   color: #0b1107;
@@ -210,6 +215,12 @@ h1 {
 }
 
 .pin-btn:hover { background: #c8ff8b; }
+
+.pin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--muted);
+}
 
 .error-msg {
   color: var(--error);
@@ -658,7 +669,7 @@ footer {
 
 <script>
 // Korrekter SHA-256 Hash für das Passwort: J+:or7dsk5kJfV-b04cs
-const HASH_TARGET = "0608af0aba24abcd19a090eb24e9269313f448b0b7b8f9bd6a760a54683dd8ba";
+const HASH_TARGET = "c1b6ec562ca6b3b59e479e8658fd4f2535700989de7ed1a213afea7639f51043";
 
 const SECURE_DATA = {
   emP: "Jonas.bock@bock-familie.de",
@@ -669,6 +680,11 @@ const SECURE_DATA = {
 let decryptedStore = null;
 let activeKey = null;
 let currentLang = "de";
+
+// Rate Limiting / Sperr-Variablen
+let failedAttempts = parseInt(localStorage.getItem("failedAttempts") || "0", 10);
+let lockoutUntil = parseInt(localStorage.getItem("lockoutUntil") || "0", 10);
+let lockoutTimer = null;
 
 const translations = {
   de: {
@@ -748,13 +764,56 @@ function updateModalContent() {
   document.getElementById("modal-body").innerHTML = contactHtml + privacyHtml;
 }
 
+// Prüft, ob der Nutzer aktuell gesperrt ist und aktualisiert den Countdown
+function checkLockout() {
+  const now = Date.now();
+  const remaining = Math.ceil((lockoutUntil - now) / 1000);
+  const pinInput = document.getElementById("pinInput");
+  const unlockBtn = document.getElementById("unlockBtn");
+  const errorMsg = document.getElementById("errorMsg");
+
+  if (remaining > 0) {
+    pinInput.disabled = true;
+    unlockBtn.disabled = true;
+    errorMsg.style.display = "block";
+    errorMsg.textContent = `Zu viele Fehlversuche. Bitte warten Sie ${remaining} Sekunden.`;
+
+    if (!lockoutTimer) {
+      lockoutTimer = setInterval(() => {
+        const currentRemaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        if (currentRemaining <= 0) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+          localStorage.removeItem("lockoutUntil");
+          localStorage.removeItem("failedAttempts");
+          failedAttempts = 0;
+          lockoutUntil = 0;
+          pinInput.disabled = false;
+          unlockBtn.disabled = false;
+          errorMsg.style.display = "none";
+        } else {
+          errorMsg.textContent = `Zu viele Fehlversuche. Bitte warten Sie ${currentRemaining} Sekunden.`;
+        }
+      }, 1000);
+    }
+    return true;
+  }
+  return false;
+}
+
 async function attemptUnlock(passphrase) {
+  if (checkLockout()) return false;
   if (!passphrase) return false;
   const cleanPass = passphrase.trim();
 
   const inputHash = await sha256(cleanPass);
 
   if (inputHash === HASH_TARGET) {
+    // Erfolgreich -> Fehlversuche zurücksetzen
+    localStorage.removeItem("failedAttempts");
+    localStorage.removeItem("lockoutUntil");
+    failedAttempts = 0;
+
     const emP = SECURE_DATA.emP;
     const emU = SECURE_DATA.emU;
     const ph  = SECURE_DATA.ph;
@@ -777,8 +836,25 @@ async function attemptUnlock(passphrase) {
     updateModalContent();
     localStorage.setItem("nfcPassKey", cleanPass);
     return true;
+  } else {
+    // Fehlversuch hochzählen
+    failedAttempts++;
+    localStorage.setItem("failedAttempts", failedAttempts);
+
+    if (failedAttempts >= 3) {
+      // Ab dem 3. Versuch: 30s für den 3. Versuch, dann +30s für jeden weiteren
+      // (3. Versuch = 30s, 4. Versuch = 60s, 5. Versuch = 90s, etc.)
+      const waitSeconds = (failedAttempts - 2) * 30;
+      lockoutUntil = Date.now() + (waitSeconds * 1000);
+      localStorage.setItem("lockoutUntil", lockoutUntil);
+      checkLockout();
+    } else {
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.style.display = "block";
+      errorMsg.textContent = translations[currentLang].errPin;
+    }
+    return false;
   }
-  return false;
 }
 
 function setLanguage(lang) {
@@ -792,7 +868,11 @@ function setLanguage(lang) {
   document.getElementById("txt-role").textContent = t.role;
   document.getElementById("txt-lock-title").textContent = t.lockTitle;
   document.getElementById("txt-lock-desc").textContent = t.lockDesc;
-  document.getElementById("errorMsg").textContent = t.errPin;
+  
+  if (!checkLockout()) {
+    document.getElementById("errorMsg").textContent = t.errPin;
+  }
+
   document.getElementById("txt-save-title").textContent = t.saveTitle;
   document.getElementById("txt-save-desc").textContent = t.saveDesc;
   document.getElementById("txt-wa-desc").textContent = t.waDesc;
@@ -818,12 +898,10 @@ function setLanguage(lang) {
 }
 
 document.getElementById("unlockBtn").addEventListener("click", async () => {
+  if (checkLockout()) return;
   document.getElementById("errorMsg").style.display = "none";
   const pin = document.getElementById("pinInput").value;
-  const ok = await attemptUnlock(pin);
-  if (!ok) {
-    document.getElementById("errorMsg").style.display = "block";
-  }
+  await attemptUnlock(pin);
 });
 
 document.getElementById("pinInput").addEventListener("keypress", async (e) => {
@@ -932,6 +1010,9 @@ document.getElementById("sharePage").addEventListener("click", async () => {
 
 // Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
 async function initSecurity() {
+  // Direkt beim Start prüfen, ob eine aktive Sperre vorliegt
+  if (checkLockout()) return;
+
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get("key");
   const storedPass = localStorage.getItem("nfcPassKey");
