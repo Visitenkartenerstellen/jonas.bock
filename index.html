@@ -659,7 +659,6 @@ footer {
 <script>
 // SHA-256 Hash für das Passwort: J+:or7dsk5kJfV-b04cs
 const HASH_TARGET = "0608af0aba24abcd19a090eb24e9269313f448b0b7b8f9bd6a760a54683dd8ba";
-const AUTO_LOCK_MS = 5 * 60 * 1000; // 5 Minuten in Millisekunden
 
 const SECURE_DATA = {
   emP: "Jonas.bock@bock-familie.de",
@@ -670,7 +669,6 @@ const SECURE_DATA = {
 let decryptedStore = null;
 let activeKey = null;
 let currentLang = "de";
-let inactivityTimer = null;
 
 const translations = {
   de: {
@@ -750,31 +748,6 @@ function updateModalContent() {
   document.getElementById("modal-body").innerHTML = contactHtml + privacyHtml;
 }
 
-// Inaktivitäts-Timer zur automatischen Sperre nach 5 Minuten
-function lockPage() {
-  decryptedStore = null;
-  activeKey = null;
-  localStorage.removeItem("nfcPassKey");
-  localStorage.removeItem("unlockTimestamp");
-
-  document.getElementById("protectedContent").classList.remove("unlocked");
-  document.getElementById("lockCard").style.display = "block";
-  document.getElementById("pinInput").value = "";
-  updateModalContent();
-}
-
-function resetInactivityTimer() {
-  if (inactivityTimer) clearTimeout(inactivityTimer);
-  if (decryptedStore) {
-    localStorage.setItem("unlockTimestamp", Date.now().toString());
-    inactivityTimer = setTimeout(lockPage, AUTO_LOCK_MS);
-  }
-}
-
-["click", "touchstart", "mousemove", "keypress", "scroll"].forEach(evt => {
-  window.addEventListener(evt, resetInactivityTimer, { passive: true });
-});
-
 async function attemptUnlock(passphrase) {
   if (!passphrase) return false;
   const cleanPass = passphrase.trim();
@@ -803,8 +776,6 @@ async function attemptUnlock(passphrase) {
 
     updateModalContent();
     localStorage.setItem("nfcPassKey", cleanPass);
-    localStorage.setItem("unlockTimestamp", Date.now().toString());
-    resetInactivityTimer();
     return true;
   }
   return false;
@@ -948,6 +919,7 @@ document.getElementById("saveContact").addEventListener("click", () => {
         generateAndDownloadVCard(mapsUrl);
       },
       (error) => {
+        // Falls der Nutzer ablehnt oder der Standort nicht ermittelt wird
         generateAndDownloadVCard();
       },
       { timeout: 15000, maximumAge: 60000, enableHighAccuracy: true }
@@ -984,26 +956,19 @@ document.getElementById("sharePage").addEventListener("click", async () => {
   }
 });
 
-// Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session (mit Ablaufprüfung)
+// Auto-Entschlüsselung beim Aufrufen über NFC-Link oder gespeicherte Session
 async function initSecurity() {
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get("key");
   const storedPass = localStorage.getItem("nfcPassKey");
-  const storedTimestamp = localStorage.getItem("unlockTimestamp");
 
   if (keyParam) {
     const success = await attemptUnlock(keyParam);
     if (success) return;
   }
   
-  if (storedPass && storedTimestamp) {
-    const elapsed = Date.now() - parseInt(storedTimestamp, 10);
-    if (elapsed < AUTO_LOCK_MS) {
-      await attemptUnlock(storedPass);
-    } else {
-      // Zeit abgelaufen: Session löschen
-      lockPage();
-    }
+  if (storedPass) {
+    await attemptUnlock(storedPass);
   }
 }
 
